@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#101522">
+<title>Go dice par Kaiwen</title>
+<style>
+:root{--bg:#101522;--panel:#1a2334;--panel2:#222e43;--text:#f5f7fb;--muted:#aab5c7;--accent:#65e0c2;--gold:#ffd166}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#26344b,var(--bg) 55%);color:var(--text);font:16px system-ui,Arial,sans-serif;min-height:100vh}
+header{padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.logo{font-size:clamp(22px,4vw,34px);font-weight:900;letter-spacing:.5px}.logo span{color:var(--accent)}
+.status{color:var(--muted);font-size:13px}
+main{max-width:1100px;margin:auto;padding:8px 18px 36px}
+.panel{background:linear-gradient(145deg,#202c40,#171f2e);border:1px solid #34445c;border-radius:20px;padding:18px;margin:12px 0;box-shadow:0 12px 35px #0004}
+h2{margin:0 0 12px;font-size:20px}p{color:var(--muted);line-height:1.45}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button,select,input{font:inherit;border:0;border-radius:13px;padding:12px 15px}
+button{background:var(--accent);color:#10202a;font-weight:800;cursor:pointer;touch-action:manipulation}
+button.secondary{background:#34445c;color:var(--text)}button.gold{background:var(--gold)}
+button:disabled{opacity:.45;cursor:not-allowed}
+input,select{background:#101827;color:var(--text);border:1px solid #40516b;min-width:0}
+.dice-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px}
+.die{background:#101827;border:1px solid #35465e;border-radius:16px;padding:13px;min-height:130px}
+.dot{font-size:38px;font-weight:900;color:var(--accent);line-height:1.2}.die small{display:block;color:var(--muted);overflow-wrap:anywhere}
+.game-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px}
+.game{background:#26364d;border:1px solid #40516b;border-radius:16px;padding:15px;text-align:left;color:white;min-height:100px}
+.game b{display:block;font-size:17px;margin-bottom:5px}.game span{font-size:13px;color:#c4cede}
+.scoreboard{display:flex;gap:8px;flex-wrap:wrap}.score{background:#101827;padding:10px 13px;border-radius:12px;border:1px solid #34445c}
+#message{font-weight:700;color:var(--gold);min-height:24px}.big{font-size:clamp(34px,7vw,64px);font-weight:950;color:var(--accent);text-align:center;padding:10px}
+footer{text-align:center;color:#8996aa;font-size:12px;padding:10px}
+@media(min-width:760px){main{padding-top:15px}.panel{padding:22px}}
+</style>
+</head>
+<body>
+<header><div class="logo">GO DICE <span>PAR KAIWEN</span></div><div class="status">ANDROID TABLET • JUSQU’À 6 DÉS</div></header>
+<main>
+<section class="panel">
+ <h2>🎲 Connexion des dés</h2>
+ <p>Active le Bluetooth, puis connecte les dés un par un. Autorise Chrome à accéder à chaque GoDice lorsqu’il le demande.</p>
+ <div class="row"><button id="connect">＋ Connecter un dé</button><button class="secondary" id="battery">🔋 Lire les batteries</button><button class="secondary" id="demo">Mode démonstration</button></div>
+ <p id="message">Prêt à jouer. Aucun dé connecté pour le moment.</p>
+ <div class="dice-grid" id="diceGrid"></div>
+</section>
+<section class="panel">
+ <h2>👥 Joueurs</h2>
+ <div class="row"><input id="playerName" placeholder="Nom du joueur" maxlength="18"><button id="addPlayer">Ajouter</button></div>
+ <div class="scoreboard" id="players"></div>
+</section>
+<section class="panel">
+ <h2>🕹️ Choisis ton mini-jeu</h2>
+ <div class="game-grid">
+  <button class="game" data-game="duel"><b>⚔️ Duel</b><span>Le meilleur lancer remporte la manche.</span></button>
+  <button class="game" data-game="sum"><b>➕ Course au total</b><span>Atteins 50 points en premier.</span></button>
+  <button class="game" data-game="memory"><b>🧠 Mémoire</b><span>Répète la suite de chiffres.</span></button>
+  <button class="game" data-game="target"><b>🎯 Nombre cible</b><span>Approche-toi le plus possible de la cible.</span></button>
+  <button class="game" data-game="yams"><b>🏆 Yams express</b><span>Jusqu’à 3 lancers pour une combinaison.</span></button>
+  <button class="game" data-game="mystery"><b>🎁 Défi mystère</b><span>Un résultat, un défi à relever.</span></button>
+ </div>
+ <div id="gameArea" hidden>
+  <hr style="border-color:#34445c;margin:18px 0">
+  <h2 id="gameTitle">Partie</h2><p id="gameInfo">Lance les dés connectés pour jouer.</p>
+  <div class="big" id="gameResult">—</div>
+  <div class="row"><button id="rollVirtual" class="secondary">Lancer de démonstration</button><button id="resetGame" class="gold">Nouvelle manche</button></div>
+ </div>
+</section>
+</main>
+<footer>Go dice par Kaiwen – prototype communautaire non officiel. GoDice et Particula sont des marques de leurs propriétaires.</footer>
+<script src="https://cdn.jsdelivr.net/gh/ParticulaCode/GoDiceJavaScriptAPI@main/godice.js"></script>
+<script>
+const dice={},players=[];let currentGame='',lastRolls=[],turn=0,memory=[],memoryStep=0,target=0;
+const $=id=>document.getElementById(id);
+const colors=['#65e0c2','#ffd166','#ff7b7b','#82aaff','#c69bff','#ffad66'];
+function msg(t){$('message').textContent=t}
+function renderDice(){
+ const host=$('diceGrid');host.innerHTML='';
+ Object.entries(dice).forEach(([id,d])=>{
+  const el=document.createElement('div');el.className='die';
+  el.innerHTML=`<div class="row" style="justify-content:space-between"><b>${d.name}</b><span>●</span></div><div class="dot">${d.value??'—'}</div><small>${d.connected?'Connecté':'Déconnecté'} · Batterie : ${d.battery??'—'}</small><small>${d.colorName||'Couleur à identifier'}</small>`;
+  host.appendChild(el);
+ });
+}
+function renderPlayers(){ $('players').innerHTML='';players.forEach((p,i)=>{let s=document.createElement('div');s.className='score';s.textContent=`${p.name} · ${p.score} pts`;s.style.borderColor=colors[i%6];$('players').appendChild(s)});}
+$('addPlayer').onclick=()=>{let n=$('playerName').value.trim();if(!n||players.length>=6)return;players.push({name:n,score:0});$('playerName').value='';renderPlayers()};
+['Joueur 1','Joueur 2'].forEach(n=>players.push({name:n,score:0}));renderPlayers();
+function onRoll(id,value){if(!dice[id])return;dice[id].value=Number(value);dice[id].connected=true;lastRolls.push({id,value:Number(value)});renderDice();handleGame(Number(value),id)}
+if(typeof GoDice!=='undefined'){
+ GoDice.prototype.onDiceConnected=function(id,instance){dice[id]={name:'Dé '+(Object.keys(dice).length+1),instance,connected:true,value:null,battery:null};renderDice();msg('Dé connecté : '+id);};
+ GoDice.prototype.onDiceDisconnected=function(id){if(dice[id])dice[id].connected=false;renderDice();msg('Un dé a été déconnecté.');};
+ GoDice.prototype.onRollStart=function(id){msg((dice[id]?.name||'Dé')+' roule…');};
+ GoDice.prototype.onStable=function(id,value){onRoll(id,value);msg((dice[id]?.name||'Dé')+' : '+value);};
+ GoDice.prototype.onTiltStable=function(id,xyz,value){onRoll(id,value);};
+ GoDice.prototype.onFakeStable=function(id,value){onRoll(id,value);};
+ GoDice.prototype.onMoveStable=function(id,value){onRoll(id,value);};
+ GoDice.prototype.onBatteryLevel=function(id,level){if(dice[id])dice[id].battery=level;renderDice();};
+ GoDice.prototype.onDiceColor=function(id,color){if(dice[id])dice[id].colorName=['Noir','Rouge','Vert','Bleu','Jaune','Orange'][Number(color)]||('Couleur '+color);renderDice();};
+}
+$('connect').onclick=async()=>{if(typeof GoDice==='undefined'){msg('API GoDice non chargée. Vérifie ta connexion Internet.');return;}if(Object.keys(dice).length>=6){msg('Les 6 emplacements sont déjà utilisés.');return;}try{const d=new GoDice();await d.requestDevice();}catch(e){msg('Connexion annulée ou impossible. Vérifie Bluetooth et autorisations Chrome.');}};
+$('battery').onclick=()=>Object.values(dice).forEach(d=>d.instance?.getBatteryLevel());
+$('demo').onclick=()=>{for(let i=0;i<6;i++){let id='DEMO-'+(i+1);if(!dice[id])dice[id]={name:'Dé démo '+(i+1),connected:true,value:null,battery:'100%',colorName:'Simulation'};}renderDice();msg('Mode démonstration activé. Les dés affichés sont simulés.');};
+document.querySelectorAll('[data-game]').forEach(b=>b.onclick=()=>startGame(b.dataset.game));
+function startGame(g){currentGame=g;lastRolls=[];$('gameArea').hidden=false;const titles={duel:'⚔️ Duel',sum:'➕ Course au total',memory:'🧠 Mémoire',target:'🎯 Nombre cible',yams:'🏆 Yams express',mystery:'🎁 Défi mystère'};$('gameTitle').textContent=titles[g];$('gameResult').textContent='À toi de jouer !';if(g==='target'){target=1+Math.floor(Math.random()*6);$('gameInfo').textContent='Trouve le chiffre secret entre 1 et 6.'}else if(g==='memory'){memory=Array.from({length:4},()=>1+Math.floor(Math.random()*6));memoryStep=0;$('gameInfo').textContent='Mémorise cette suite : '+memory.join(' – ')}else $('gameInfo').textContent='Lance un ou plusieurs GoDice physiques. Les résultats seront pris en compte automatiquement.';}
+function handleGame(v,id){if(!currentGame)return;let p=players[turn%players.length];if(currentGame==='duel'){$('gameResult').textContent='🎲 '+v;$('gameInfo').textContent=p.name+' a lancé '+v+'. Passe au joueur suivant pour comparer.';p.score+=v;turn++;renderPlayers();}
+else if(currentGame==='sum'){p.score+=v;$('gameResult').textContent='+'+v+' points';$('gameInfo').textContent=p.name+' : '+p.score+'/50 points';if(p.score>=50){$('gameInfo').textContent='🏆 '+p.name+' remporte la partie !';players.forEach(x=>x.score=0);}turn++;renderPlayers();}
+else if(currentGame==='memory'){let expected=memory[memoryStep];if(v===expected){memoryStep++;$('gameResult').textContent='Bien joué !';$('gameInfo').textContent=memoryStep===memory.length?'🏆 Suite réussie !':'Encore '+(memory.length-memoryStep)+' chiffre(s).';}else{$('gameResult').textContent='Raté !';$('gameInfo').textContent='La suite était : '+memory.join(' – ');}}
+else if(currentGame==='target'){$('gameResult').textContent=v===target?'🎯 Trouvé !':(v<target?'Trop petit !':'Trop grand !');}
+else if(currentGame==='yams'){lastRolls.push({id,value:v});let vals=lastRolls.map(x=>x.value);let counts={};vals.forEach(x=>counts[x]=(counts[x]||0)+1);$('gameResult').textContent=vals.join(' · ');$('gameInfo').textContent=Object.values(counts).includes(5)?'YAMS !':Object.values(counts).includes(4)?'Carré !':'Continue à lancer (jusqu’à 3 essais).';}
+else if(currentGame==='mystery'){const tasks=['Raconte une blague en 10 secondes.','Fais deviner un animal sans parler.','Chante le refrain d’une chanson.','Imite un personnage célèbre.','Fais 5 secondes de danse.','Choisis qui lance ensuite !'];$('gameResult').textContent='Défi n°'+v;$('gameInfo').textContent=tasks[v-1];}}
+$('rollVirtual').onclick=()=>{let available=Object.keys(dice).length?Object.keys(dice):['DEMO'];let id=available[Math.floor(Math.random()*available.length)];let v=1+Math.floor(Math.random()*6);if(!dice[id])dice[id]={name:'Dé de démonstration',connected:true};onRoll(id,v);msg('Lancer simulé : '+v+' (pas un résultat Bluetooth).');};
+$('resetGame').onclick=()=>startGame(currentGame);
+</script>
+</body>
+</html>
